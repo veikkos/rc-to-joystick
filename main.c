@@ -30,6 +30,30 @@ const bool invert_axis[NUM_CHANNELS] = {
     true
 };
 
+#define FILTER_PIN PINF
+#define FILTER_DDR DDRF
+#define FILTER_PORT PORTF
+#define FILTER_INPUT PF6
+#define FILTER_GND PF7
+
+#define FILTER_SHIFT 1
+bool filtering_enabled = false;
+
+volatile uint16_t ch_pulse[NUM_CHANNELS] = {PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER};
+volatile uint16_t ch_filtered[NUM_CHANNELS] = {PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER};
+volatile uint16_t ch_start[NUM_CHANNELS] = {0};
+volatile uint8_t  ch_edge[NUM_CHANNELS] = {0};
+
+volatile uint8_t prev_pinb = 0;
+
+#define FILTER_UPDATE(raw, filtered, shift) do { \
+    int16_t delta = (int16_t)(raw) - (int16_t)(filtered); \
+    int32_t temp = (int32_t)(filtered) + (delta >> (shift)); \
+    if (temp < 0) temp = 0; \
+    if (temp > 65535) temp = 65535; \
+    (filtered) = (uint16_t)temp; \
+} while (0)
+
 /** Buffer to hold the previously generated HID report, for comparison purposes inside the HID class driver. */
 static uint8_t PrevJoystickHIDReportBuffer[sizeof(USB_JoystickReport_Data_t)];
 
@@ -53,12 +77,6 @@ USB_ClassInfo_HID_Device_t Joystick_HID_Interface =
     },
 };
 
-volatile uint16_t ch_pulse[NUM_CHANNELS] = {PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER};
-volatile uint16_t ch_start[NUM_CHANNELS] = {0};
-volatile uint8_t  ch_edge[NUM_CHANNELS] = {0};
-
-volatile uint8_t prev_pinb = 0;
-
 ISR(PCINT0_vect) {
     uint8_t pinb = PINB;
     uint8_t changed = pinb ^ prev_pinb;
@@ -74,6 +92,10 @@ ISR(PCINT0_vect) {
             } else if (ch_edge[i]) {
                 ch_pulse[i] = now - ch_start[i];
                 ch_edge[i] = 0;
+
+                if (filtering_enabled) {
+                    FILTER_UPDATE(ch_pulse[i], ch_filtered[i], FILTER_SHIFT);
+                }
             }
         }
     }
@@ -98,6 +120,22 @@ void setup_inputs(void) {
     TCNT1 = 0;
 }
 
+void init_filtering()
+{
+    // Configure F6 as input with pull-up, F7 as output and low
+    FILTER_DDR &= ~(1 << FILTER_INPUT);         // F6 as input
+    FILTER_PORT |= (1 << FILTER_INPUT);         // Enable pull-up on F6
+
+    FILTER_DDR |= (1 << FILTER_GND);            // F7 as output
+    FILTER_PORT &= ~(1 << FILTER_GND);          // Drive F7 low
+}
+
+void check_filtering()
+{
+    // Detect jumper: if F6 reads low, jumper is connected
+    filtering_enabled = !(FILTER_PIN & (1 << FILTER_INPUT));
+}
+
 int main(void) {
     // Disable watchdog (in case it was enabled by bootloader)
     MCUSR &= ~(1 << WDRF);  // Clear watchdog reset flag
@@ -107,11 +145,13 @@ int main(void) {
     clock_prescale_set(clock_div_1);
 
     DDRD |= (1 << PD6);
+    init_filtering();
     setup_inputs();
     USB_Init();
     sei();
 
     while (1) {
+        check_filtering();
         HID_Device_USBTask(&Joystick_HID_Interface);
         USB_USBTask();
     }
@@ -164,12 +204,13 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
     void* ReportData,
     uint16_t* const ReportSize)
 {
-    PORTD ^= (1 << PD6);
+    if (filtering_enabled)
+        PORTD |= (1 << PD6);
 
     USB_JoystickReport_Data_t* report = (USB_JoystickReport_Data_t*)ReportData;
 
     for (uint8_t i = 0; i < NUM_CHANNELS; i++) {
-        uint16_t pulse = ch_pulse[i];
+        uint16_t pulse = filtering_enabled ? ch_filtered[i] : ch_pulse[i];
 
         if (pulse < PULSE_MIN) pulse = PULSE_MIN;
         if (pulse > PULSE_MAX) pulse = PULSE_MAX;
@@ -181,6 +222,8 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
 
         report->axes[i] = centered;
     }
+
+    PORTD &= ~(1 << PD6);
 
     *ReportSize = sizeof(USB_JoystickReport_Data_t);
     return true;

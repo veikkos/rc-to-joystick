@@ -13,3 +13,7 @@ The code has been written with the help of an AI.
 Connect the pins (not red power) from the receiver to PB0...PB7 i.e. you can use 1 to 8 channels at the same time.
 
 ![Picture](./media/pic.jpg)
+
+### Filtering
+
+Ground PF6 or connect it to PF7 to enable filtering.
