@@ -9,14 +9,25 @@
 #include <LUFA/Drivers/USB/USB.h>
 #include <LUFA/Drivers/USB/Class/Device/HIDClassDevice.h>
 
-#define NUM_CHANNELS 4
-#define PCINT_START 4  // PB4
+#define NUM_CHANNELS 8
+#define PCINT_START 0 // PB0
+
+#define TIMER_CLOCK_MHZ 2
+
+#define PULSE_MIN (1000 * TIMER_CLOCK_MHZ)   // 2000
+#define PULSE_MAX (2000 * TIMER_CLOCK_MHZ)   // 4000
+#define PULSE_CENTER (1500 * TIMER_CLOCK_MHZ)   // 3000
+#define RANGE (PULSE_MAX - PULSE_MIN) // 2000
 
 const bool invert_axis[NUM_CHANNELS] = {
-    true, // Channel 0 (X)
-    false,  // Channel 1 (Y) -- inverted
-    false, // Channel 2 (Z)
-    false  // Channel 3 (if extended)
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true,
+    true
 };
 
 /** Buffer to hold the previously generated HID report, for comparison purposes inside the HID class driver. */
@@ -42,7 +53,7 @@ USB_ClassInfo_HID_Device_t Joystick_HID_Interface =
     },
 };
 
-volatile uint16_t ch_pulse[NUM_CHANNELS] = {1500, 1500, 1500, 1500};
+volatile uint16_t ch_pulse[NUM_CHANNELS] = {PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER};
 volatile uint16_t ch_start[NUM_CHANNELS] = {0};
 volatile uint8_t  ch_edge[NUM_CHANNELS] = {0};
 
@@ -60,7 +71,7 @@ ISR(PCINT0_vect) {
             if (pinb & mask) {
                 ch_start[i] = now;
                 ch_edge[i] = 1;
-                } else if (ch_edge[i]) {
+            } else if (ch_edge[i]) {
                 ch_pulse[i] = now - ch_start[i];
                 ch_edge[i] = 0;
             }
@@ -69,12 +80,12 @@ ISR(PCINT0_vect) {
 }
 
 void setup_inputs(void) {
-    // PB4-PB7 = inputs with pull-ups
-    DDRB &= ~((1 << PB4) | (1 << PB5) | (1 << PB6) | (1 << PB7));
-    PORTB |= (1 << PB4) | (1 << PB5) | (1 << PB6) | (1 << PB7);
+    // PB0-PB7 = inputs with pull-ups
+    DDRB &= ~0xFF;
+    PORTB |= 0xFF;
 
-    // Enable PCINT for PB4-PB7 (PCINT4-PCINT7)
-    PCMSK0 |= (1 << PCINT4) | (1 << PCINT5) | (1 << PCINT6) | (1 << PCINT7);
+    // Enable PCINT for PB0-PB7 (PCINT0-PCINT7)
+    PCMSK0 |= 0xFF;
 
     // Enable Pin Change Interrupt 0
     PCICR |= (1 << PCIE0);
@@ -153,25 +164,22 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
     void* ReportData,
     uint16_t* const ReportSize)
 {
-    PORTD ^= (1 << PD6); // LED toggle for debug
+    PORTD ^= (1 << PD6);
 
     USB_JoystickReport_Data_t* report = (USB_JoystickReport_Data_t*)ReportData;
 
     for (uint8_t i = 0; i < NUM_CHANNELS; i++) {
-        int16_t centered = (int16_t)ch_pulse[i] - 3000;  // 1500 µs center
-        // Limit to -1000…+1000 (i.e., ±500 µs)
-        if (centered < -1000) centered = -1000;
-        if (centered >  1000) centered =  1000;
-        int8_t mapped = centered / 10;  // Map to approx -100…100
-        if (invert_axis[i]) {
-            mapped = -mapped;
-        }
-        switch (i) {
-            case 0: report->X = mapped; break;
-            case 1: report->Y = mapped; break;
-            case 2: report->Z = mapped; break;
-            // Extend here for additional channels if needed
-        }
+        uint16_t pulse = ch_pulse[i];
+
+        if (pulse < PULSE_MIN) pulse = PULSE_MIN;
+        if (pulse > PULSE_MAX) pulse = PULSE_MAX;
+
+        int16_t centered = (int16_t)pulse - PULSE_CENTER;
+
+        if (invert_axis[i])
+            centered = -centered;
+
+        report->axes[i] = centered;
     }
 
     *ReportSize = sizeof(USB_JoystickReport_Data_t);

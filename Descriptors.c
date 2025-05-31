@@ -45,14 +45,28 @@
  */
 const USB_Descriptor_HIDReport_Datatype_t PROGMEM JoystickReport[] =
 {
-	/* Use the HID class driver's standard Joystick report.
-	 *   Min X/Y/Z Axis values: -100
-	 *   Max X/Y/Z Axis values:  100
-	 *   Min physical X/Y/Z Axis values (used to determine resolution): -1
-	 *   Max physical X/Y/Z Axis values (used to determine resolution):  1
-	 *   Buttons: 2
-	 */
-	HID_DESCRIPTOR_JOYSTICK(-100, 100, -1, 1, 2)
+    0x05, 0x01,        // Usage Page (Generic Desktop)
+    0x09, 0x04,        // Usage (Joystick)
+    0xA1, 0x01,        // Collection (Application)
+
+    0xA1, 0x00,        //   Collection (Physical)
+    0x05, 0x01,        //     Usage Page (Generic Desktop)
+    0x09, 0x30,        //     Usage (X)
+    0x09, 0x31,        //     Usage (Y)
+    0x09, 0x32,        //     Usage (Z)
+    0x09, 0x33,        //     Usage (Rx)
+    0x09, 0x34,        //     Usage (Ry)
+    0x09, 0x35,        //     Usage (Rz)
+    0x09, 0x36,        //     Usage (Slider)
+    0x09, 0x37,        //     Usage (Dial)
+    0x16, 0x18, 0xFC,  // Logical Minimum (-1000)
+    0x26, 0xE8, 0x03,  // Logical Maximum (1000)
+    0x75, 0x10,        //     Report Size: 16 bits
+    0x95, 0x08,        //     Report Count: 8 axes
+    0x81, 0x02,        //     Input (Data, Var, Abs)
+    0xC0,              //   End Collection
+
+    0xC0               // End Collection
 };
 
 /** Device descriptor structure. This descriptor, located in FLASH memory, describes the overall
@@ -152,13 +166,13 @@ const USB_Descriptor_String_t PROGMEM LanguageString = USB_STRING_DESCRIPTOR_ARR
  *  form, and is read out upon request by the host when the appropriate string ID is requested, listed in the Device
  *  Descriptor.
  */
-const USB_Descriptor_String_t PROGMEM ManufacturerString = USB_STRING_DESCRIPTOR(L"LUFA Library");
+const USB_Descriptor_String_t PROGMEM ManufacturerString = USB_STRING_DESCRIPTOR(L"veikko");
 
 /** Product descriptor string. This is a Unicode string containing the product's details in human readable form,
  *  and is read out upon request by the host when the appropriate string ID is requested, listed in the Device
  *  Descriptor.
  */
-const USB_Descriptor_String_t PROGMEM ProductString = USB_STRING_DESCRIPTOR(L"LUFA Joystick Demo");
+const USB_Descriptor_String_t PROGMEM ProductString = USB_STRING_DESCRIPTOR(L"rc-to-joystic");
 
 /** This function is called by the library when in device mode, and must be overridden (see library "USB Descriptors"
  *  documentation) by the application code so that the address and size of a requested descriptor can be given
