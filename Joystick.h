@@ -54,7 +54,7 @@
 		 */
 		typedef struct
 		{
-            int16_t axes[8];
+			int16_t axes[6];
 		} USB_JoystickReport_Data_t;
 
 	/* Function Prototypes: */

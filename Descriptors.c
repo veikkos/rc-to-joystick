@@ -57,16 +57,14 @@ const USB_Descriptor_HIDReport_Datatype_t PROGMEM JoystickReport[] =
     0x09, 0x33,        //     Usage (Rx)
     0x09, 0x34,        //     Usage (Ry)
     0x09, 0x35,        //     Usage (Rz)
-    0x09, 0x36,        //     Usage (Slider)
-    0x09, 0x37,        //     Usage (Dial)
-    0x16, 0x18, 0xFC,  // Logical Minimum (-1000)
-    0x26, 0xE8, 0x03,  // Logical Maximum (1000)
-    0x75, 0x10,        //     Report Size: 16 bits
-    0x95, 0x08,        //     Report Count: 8 axes
-    0x81, 0x02,        //     Input (Data, Var, Abs)
-    0xC0,              //   End Collection
+    0x16, 0x18, 0xFC,  //   Logical Minimum (-1000)
+    0x26, 0xE8, 0x03,  //   Logical Maximum (1000)
+    0x75, 0x10,        //   Report Size: 16 bits
+    0x95, 0x06,        //   Report Count: 6
+    0x81, 0x02,        //   Input (Data, Var, Abs)
+    0xC0,              // End Physical Collection
 
-    0xC0               // End Collection
+    0xC0               // End Application Collection
 };
 
 /** Device descriptor structure. This descriptor, located in FLASH memory, describes the overall

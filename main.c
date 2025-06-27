@@ -1,5 +1,3 @@
-// pcint_pwm_joystick.c - Teensy 2.0++ (AT90USB1286) using PCINT2 group for 4-channel RC PWM to USB joystick
-
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <avr/wdt.h>
@@ -9,8 +7,8 @@
 #include <LUFA/Drivers/USB/USB.h>
 #include <LUFA/Drivers/USB/Class/Device/HIDClassDevice.h>
 
-#define NUM_CHANNELS 8
-#define PCINT_START 0 // PB0
+#define NUM_CHANNELS 6
+#define PCINT_START 1 // PB1
 
 #define TIMER_CLOCK_MHZ 2
 
@@ -20,8 +18,6 @@
 #define RANGE (PULSE_MAX - PULSE_MIN) // 2000
 
 const bool invert_axis[NUM_CHANNELS] = {
-    true,
-    true,
     true,
     true,
     true,
@@ -39,8 +35,8 @@ const bool invert_axis[NUM_CHANNELS] = {
 #define FILTER_SHIFT 1
 bool filtering_enabled = false;
 
-volatile uint16_t ch_pulse[NUM_CHANNELS] = {PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER};
-volatile uint16_t ch_filtered[NUM_CHANNELS] = {PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER};
+volatile uint16_t ch_pulse[NUM_CHANNELS] = {PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER};
+volatile uint16_t ch_filtered[NUM_CHANNELS] = {PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER, PULSE_CENTER};
 volatile uint16_t ch_start[NUM_CHANNELS] = {0};
 volatile uint8_t  ch_edge[NUM_CHANNELS] = {0};
 
@@ -102,12 +98,12 @@ ISR(PCINT0_vect) {
 }
 
 void setup_inputs(void) {
-    // PB0-PB7 = inputs with pull-ups
-    DDRB &= ~0xFF;
-    PORTB |= 0xFF;
+    // PB1–PB6 = inputs with pull-ups
+    DDRB &= ~((1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4) | (1 << PB5) | (1 << PB6));
+    PORTB |= (1 << PB1) | (1 << PB2) | (1 << PB3) | (1 << PB4) | (1 << PB5) | (1 << PB6);
 
-    // Enable PCINT for PB0-PB7 (PCINT0-PCINT7)
-    PCMSK0 |= 0xFF;
+    // Enable PCINT1–PCINT6
+    PCMSK0 |= (1 << PCINT1) | (1 << PCINT2) | (1 << PCINT3) | (1 << PCINT4) | (1 << PCINT5) | (1 << PCINT6);
 
     // Enable Pin Change Interrupt 0
     PCICR |= (1 << PCIE0);
@@ -144,7 +140,9 @@ int main(void) {
     /* Disable clock division */
     clock_prescale_set(clock_div_1);
 
-    DDRD |= (1 << PD6);
+    PORTD |= (1 << PD5);
+    DDRD |= (1 << PD5);
+
     init_filtering();
     setup_inputs();
     USB_Init();
@@ -205,7 +203,7 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
     uint16_t* const ReportSize)
 {
     if (filtering_enabled)
-        PORTD |= (1 << PD6);
+        PORTD &= ~(1 << PD5);
 
     USB_JoystickReport_Data_t* report = (USB_JoystickReport_Data_t*)ReportData;
 
@@ -223,7 +221,7 @@ bool CALLBACK_HID_Device_CreateHIDReport(USB_ClassInfo_HID_Device_t* const HIDIn
         report->axes[i] = centered;
     }
 
-    PORTD &= ~(1 << PD6);
+    PORTD |= (1 << PD5);
 
     *ReportSize = sizeof(USB_JoystickReport_Data_t);
     return true;
